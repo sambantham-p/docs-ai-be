@@ -1,0 +1,277 @@
+================================================================================
+  SecureDoc AI — FRONTEND DEVELOPER GUIDE
+  React + TypeScript + Vite + MobX + Web Crypto API
+  Based on: SecureDoc_AI_FRD v1.0 (March 2026)
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 1 — CREATE THE REACT PROJECT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  npm create vite@latest securedoc-frontend -- --template react-ts
+  cd securedoc-frontend
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 2 — INSTALL ALL DEPENDENCIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # Core
+  npm install react-router-dom axios mobx mobx-react-lite
+
+  # Styling
+  npm install -D tailwindcss postcss autoprefixer
+  npx tailwindcss init -p
+
+  # Types
+  npm install -D @types/node
+
+  Final package.json dependencies should include:
+  - react, react-dom
+  - react-router-dom
+  - axios
+  - mobx, mobx-react-lite
+  - tailwindcss (dev)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 3 — TAILWIND SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  In tailwind.config.js:
+    content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"]
+
+  In src/index.css:
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 4 — FOLDER STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  src/
+  ├── api/
+  │   ├── encryption/
+  │   │   └── encryption.service.ts        ← ClientEncryptionService (Web Crypto)
+  │   ├── Api.manager.ts                   ← Axios instance + request/response interceptors
+  │   ├── auth.api.ts                      ← /auth/register, /auth/login, /auth/logout
+  │   ├── documents.api.ts                 ← /documents CRUD, chunk tagging
+  │   └── chat.api.ts                      ← /conversations CRUD, send message
+  │
+  ├── stores/                              ← MobX observable stores
+  │   ├── auth.store.ts                    ← user, JWT token, login/logout actions
+  │   ├── documents.store.ts               ← document list, upload, chunk sensitivity
+  │   └── chat.store.ts                    ← conversations, messages, citations
+  │
+  ├── pages/
+  │   ├── LoginPage.tsx
+  │   ├── RegisterPage.tsx
+  │   ├── DocumentsPage.tsx
+  │   ├── DocumentDetailPage.tsx           ← chunk sensitivity tagging UI
+  │   ├── ChatPage.tsx
+  │   └── AuditPage.tsx
+  │
+  ├── components/
+  │   ├── layout/
+  │   │   ├── Sidebar.tsx                  ← dark sidebar, nav items
+  │   │   └── Topbar.tsx                   ← page title, encryption shield badge
+  │   ├── documents/
+  │   │   ├── DocumentCard.tsx             ← card with public/private chunk counts
+  │   │   ├── ChunkTagRow.tsx              ← chunk preview + PUBLIC/PRIVATE toggle
+  │   │   └── UploadModal.tsx              ← drag-and-drop, progress steps
+  │   ├── chat/
+  │   │   ├── MessageBubble.tsx            ← user (right, blue) / AI (left, white)
+  │   │   ├── CitationCard.tsx             ← collapsible source citations
+  │   │   └── ChatInput.tsx                ← textarea + send button + lock icon
+  │   └── common/
+  │       ├── SensitivityBadge.tsx         ← green PUBLIC / red PRIVATE pill
+  │       └── EncryptionBadge.tsx          ← shield icon + tooltip with RSA/AES details
+  │
+  ├── types/
+  │   ├── document.types.ts
+  │   ├── chat.types.ts
+  │   └── encryption.types.ts
+  │
+  ├── App.tsx                              ← React Router route definitions
+  └── main.tsx                             ← MobX store injection, app entry
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 5 — ENCRYPTION SERVICE (ClientEncryptionService)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  File: src/api/encryption/encryption.service.ts
+
+  This is the most critical service. It uses window.crypto.subtle (Web Crypto API).
+  No npm crypto package needed — it's built into every modern browser.
+
+  Key responsibilities:
+  1. initialize()
+     - Generate RSA-OAEP 2048-bit key pair (non-exportable private key)
+     - POST /api/v1/key-exchange with client public key as JWK
+     - Receive server public key JWK + clientId UUID
+     - Store clientId in memory (never in localStorage)
+
+  2. encryptRequest(payload: object): Promise<{ ed, esk, eiv }>
+     - Generate fresh AES-GCM 256-bit session key
+     - Generate fresh 12-byte random IV
+     - AES-GCM encrypt JSON.stringify(payload)
+     - RSA-OAEP wrap session key with SERVER public key
+     - RSA-OAEP wrap IV with SERVER public key
+     - Return { ed: base64, esk: base64, eiv: base64 }
+
+  3. decryptResponse({ ed, esk, eiv }): Promise<object>
+     - RSA-OAEP decrypt session key using CLIENT private key
+     - RSA-OAEP decrypt IV using CLIENT private key
+     - AES-GCM decrypt payload → JSON.parse → return object
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 6 — AXIOS INSTANCE (Api.manager.ts)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  File: src/api/Api.manager.ts
+
+  Create a secured Axios instance:
+    - baseURL: import.meta.env.VITE_API_BASE_URL
+    - Default header: x-encrypted: true
+
+  Request interceptor:
+    - If config.data exists, call encryptionService.encryptRequest(config.data)
+    - Replace config.data with encrypted payload { ed, esk, eiv }
+    - Add header: x-client-id: <clientId from encryption service>
+
+  Response interceptor:
+    - If response has x-encrypted header, call encryptionService.decryptResponse(response.data)
+    - Replace response.data with decrypted plain object
+
+  Auth interceptor:
+    - Read JWT from auth store, add Authorization: Bearer <token>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 7 — MOBX STORES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  auth.store.ts:
+    @observable user: User | null
+    @observable accessToken: string | null
+    @action login(email, password) → calls auth.api, stores token, calls encryptionService.initialize()
+    @action logout() → calls auth.api logout, clears token + encryption keys
+    @computed isAuthenticated: boolean
+
+  documents.store.ts:
+    @observable documents: Document[]
+    @observable selectedDocument: DocumentDetail | null
+    @action fetchDocuments()
+    @action uploadDocument(file: File)
+    @action updateChunkSensitivity(docId, chunkId, sensitivity)
+    @action bulkTagChunks(docId, chunkIds, sensitivity)
+    @action deleteDocument(docId)
+
+  chat.store.ts:
+    @observable conversations: Conversation[]
+    @observable activeConversation: ConversationDetail | null
+    @observable isLoading: boolean
+    @action createConversation(documentIds: string[])
+    @action sendMessage(conversationId, text)
+    @action fetchConversationHistory(conversationId)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 8 — ROUTING (App.tsx)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Route setup with React Router v6:
+
+  /login                   → LoginPage (public)
+  /register                → RegisterPage (public)
+  /documents               → DocumentsPage (protected)
+  /documents/:id           → DocumentDetailPage (protected)
+  /chat/:conversationId    → ChatPage (protected)
+  /audit                   → AuditPage (protected)
+
+  Wrap protected routes in a PrivateRoute component that checks auth.store.isAuthenticated.
+  Redirect unauthenticated users to /login.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 9 — KEY PAGE IMPLEMENTATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  LoginPage:
+  - Centred card, light grey background
+  - Left half: branding panel — "SecureDoc AI" 32px bold #1a56db
+    tagline: "Your documents. Your keys. Your control." 14px gray + shield icon
+  - Right half: email + password fields, submit button (bg: #1a56db, height: 44px)
+  - Notice below button: "End-to-end encrypted. Keys never leave your browser."
+  - During login: button shows spinner + "Establishing encrypted session..."
+
+  DocumentDetailPage (chunk tagging):
+  - Back arrow + document name header
+  - Stats bar: X total chunks | Y public | Z private
+  - Bulk actions: "Select all" checkbox + "Mark PUBLIC" / "Mark PRIVATE" buttons
+  - Each chunk row: checkbox | chunk index | 2-line preview text | sensitivity toggle
+  - Toggle: PUBLIC = green pill (#dcfce7 bg, #166534 text) | PRIVATE = red pill (#fee2e2 bg, #991b1b text)
+  - Sticky bottom bar: "Save Changes" button + unsaved count
+
+  ChatPage layout:
+  - 3 columns: conversation list (240px) | chat panel (flex) | document info panel (280px, collapsible)
+  - User messages: right-aligned, bg: #1a56db, white text, small lock icon
+  - AI messages: left-aligned, bg: white, border: 1px #e5e7eb
+  - Citation cards below AI messages: "Sources used (N public chunks)" collapsible
+  - Private exclusion notice: gray italic "2 private sections were excluded from this response."
+  - Chat input: full-width textarea, send button (blue), lock icon with tooltip
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 10 — API CALLS (api files)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  auth.api.ts:
+    POST  /api/v1/auth/register   { email, password, fullName }
+    POST  /api/v1/auth/login      { email, password }
+    POST  /api/v1/auth/refresh
+    POST  /api/v1/auth/logout
+
+  documents.api.ts:
+    GET   /api/v1/documents
+    POST  /api/v1/documents/upload         (multipart/form-data)
+    GET   /api/v1/documents/:id
+    PATCH /api/v1/documents/:id            { name }
+    DEL   /api/v1/documents/:id
+    PATCH /api/v1/documents/:id/chunks/:chunkId   { sensitivity: 'PUBLIC'|'PRIVATE' }
+    POST  /api/v1/documents/:id/chunks/bulk-tag   { chunkIds: string[], sensitivity }
+
+  chat.api.ts:
+    GET   /api/v1/conversations
+    POST  /api/v1/conversations            { documentIds: string[] }
+    GET   /api/v1/conversations/:id
+    POST  /api/v1/conversations/:id/messages   { message: string }
+    DEL   /api/v1/conversations/:id
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 11 — ENVIRONMENT VARIABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Create .env in frontend root:
+
+    VITE_API_BASE_URL=http://localhost:4000/api/v1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  STEP 12 — RUN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  npm run dev           → starts Vite dev server at http://localhost:5173
+  npm run build         → production build to dist/
+  npm run preview       → preview production build locally
+
+================================================================================
+  IMPORTANT SECURITY NOTES
+================================================================================
+
+  - RSA private key: generated with extractable: false — cannot be exported.
+    It only lives in browser memory for the session duration.
+
+  - clientId: store in memory only (NOT localStorage). If the page refreshes,
+    a new key exchange runs automatically on next login.
+
+  - Every Axios request through the secured instance is encrypted.
+    Do NOT call backend endpoints with a plain fetch() — always use Api.manager.ts.
+
+  - The Web Crypto API is only available in secure contexts (HTTPS or localhost).
+    In production, the frontend MUST be served over HTTPS.
+================================================================================
