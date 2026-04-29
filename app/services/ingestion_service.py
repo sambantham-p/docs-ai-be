@@ -8,20 +8,19 @@ import requests
 from fastapi import BackgroundTasks, HTTPException, UploadFile
 
 from app.config.settings import ALLOWED_EXTENSIONS, MAX_EXTRACTED_TEXT, MAX_FILE_SIZE, UPLOAD_DIR
-from app.services.document_parser import DocumentParser
+from app.services.document_parser import parse_file, parse_url_from_content
 from app.utils.file_utils import delete_file, validate_mime
 
 
-parser = DocumentParser()
 logger = logging.getLogger(__name__)
 
 
 def parse_uploaded_file(file_path: str, filename: str) -> str:
-    return parser.parse_file(file_path, filename)
+    return parse_file(file_path, filename)
 
 
 def parse_uploaded_url(html: str, url: str) -> str:
-    return parser.parse_url_from_content(html, url)
+    return parse_url_from_content(html, url)
 
 
 async def process_uploaded_file(file: UploadFile, background_tasks: BackgroundTasks) -> dict:
