@@ -1,0 +1,349 @@
+from dataclasses import dataclass, asdict
+from typing import Optional, TypedDict
+import spacy
+from app.constants.chunker_constant import (
+    BLACKLIST,
+    CAPS_HEADING_RE,
+    DEFAULT_CHUNK_MAX_TOKENS,
+    DEFAULT_OVERLAP_SENTENCES,
+    DEFAULT_VALIDATE_CHUNKS,
+    HEADING_WORD_STRIP_CHARS,
+    MARKDOWN_HEADING_RE,
+    NUMBERED_HEADING_RE,
+    SPACY_LANGUAGE,
+)
+from app.utils.chunker_utils import (
+    count_tokens,
+    decode_tokens,
+    encode_tokens,
+    hash_text,
+)
+
+
+class TokenChunk(TypedDict):
+    text: str
+    token_start: int
+    token_end: int
+    chunk_id: int
+    doc_id: Optional[str]
+
+
+@dataclass(frozen=True)
+class Chunk:
+    doc_id: str
+    chunk_index: int
+    text: str
+    section: str
+    section_index: int
+    sentence_start: int
+    sentence_end: int
+    char_start: int
+    char_end: int
+    token_count: int
+    chunk_hash: str
+
+    def to_dict(self):
+        return asdict(self)
+
+    def validate(self, doc_len: int):
+        if not self.text.strip():
+            raise ValueError(f"Chunk {self.chunk_index}: empty text")
+        if self.token_count <= 0:
+            raise ValueError(f"Chunk {self.chunk_index}: zero token count")
+        if not (0 <= self.char_start <= self.char_end <= doc_len):
+            raise ValueError(
+                f"Chunk {self.chunk_index}: invalid char range "
+                f"[{self.char_start}, {self.char_end}] for doc_len={doc_len}"
+            )
+        if self.sentence_start > self.sentence_end:
+            raise ValueError(
+                f"Chunk {self.chunk_index}: sentence_start ({self.sentence_start}) "
+                f"> sentence_end ({self.sentence_end})"
+            )
+
+
+NLP = spacy.blank(SPACY_LANGUAGE)
+NLP.add_pipe("sentencizer")
+
+
+def hybrid_chunk(
+    text: str,
+    doc_id: str,
+    max_tokens: int = DEFAULT_CHUNK_MAX_TOKENS,
+    overlap_sentences: int = DEFAULT_OVERLAP_SENTENCES,
+    validate: bool = DEFAULT_VALIDATE_CHUNKS,
+) -> list[dict]:
+    if not text.strip():
+        raise ValueError("Empty document")
+    if max_tokens <= 0:
+        raise ValueError(f"max_tokens must be > 0, got {max_tokens}")
+    if overlap_sentences < 0:
+        raise ValueError(f"overlap_sentences must be >= 0, got {overlap_sentences}")
+
+    sections = split_sections(text)
+    chunk_results = []
+    next_chunk_index = 0
+
+    for section_index, (section_title, section_text, section_start, _) in enumerate(sections):
+        sentences = split_sentences(section_text, section_start)
+        chunks = build_chunks(
+            sentences,
+            doc_id,
+            section_title,
+            section_index,
+            max_tokens,
+            overlap_sentences,
+            next_chunk_index,
+        )
+        if validate:
+            for chunk in chunks:
+                chunk.validate(len(text))
+
+        chunk_results.extend(chunk.to_dict() for chunk in chunks)
+        next_chunk_index += len(chunks)
+
+    return chunk_results
+
+
+def split_sentences(text: str, offset: int) -> list[tuple[str, int, int]]:
+    doc = NLP(text)
+    return [
+        (sent.text.strip(), offset + sent.start_char, offset + sent.end_char)
+        for sent in doc.sents
+        if sent.text.strip()
+    ]
+
+
+def split_sections(text: str) -> list[tuple[str, str, int, int]]:
+    lines = text.splitlines(keepends=True)
+    sections = []
+    section_title = ""
+    section_lines = []
+    section_start = 0
+    char_position = 0
+    previous_line_blank = True
+
+    for line in lines:
+        stripped = line.strip()
+        heading_words = [
+            word.strip(HEADING_WORD_STRIP_CHARS).upper()
+            for word in stripped.split()
+        ]
+        is_caps_heading = (
+            CAPS_HEADING_RE.fullmatch(stripped)
+            and previous_line_blank
+            and 2 <= len(heading_words) <= 8
+            and not stripped.rstrip().endswith(":")
+            and not any(word in BLACKLIST for word in heading_words)
+        )
+        is_heading = (
+            MARKDOWN_HEADING_RE.match(stripped)
+            or NUMBERED_HEADING_RE.match(stripped)
+            or is_caps_heading
+        )
+        if is_heading:
+            section_content = "".join(section_lines)
+            if section_content.strip():
+                sections.append((section_title, section_content, section_start, char_position))
+            section_title = stripped
+            section_lines = []
+            section_start = char_position + len(line)
+        else:
+            section_lines.append(line)
+
+        previous_line_blank = not stripped
+        char_position += len(line)
+
+    section_content = "".join(section_lines)
+    if section_content.strip():
+        sections.append((section_title, section_content, section_start, char_position))
+
+    return sections if sections else [("", text, 0, len(text))]
+
+
+def split_by_tokens(
+    text: str,
+    max_tokens: int,
+    overlap: int = 0,
+    doc_id: Optional[str] = None,
+) -> list[TokenChunk]:
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    if not text.strip():
+        return []
+    if max_tokens <= 0:
+        raise ValueError("max_tokens must be > 0")
+    if not (0 <= overlap < max_tokens):
+        raise ValueError("overlap must be in range [0, max_tokens)")
+
+    tokens = encode_tokens(text)
+    total_tokens = len(tokens)
+    if total_tokens <= max_tokens:
+        return [
+            {
+                "text": decode_tokens(tokens),
+                "token_start": 0,
+                "token_end": total_tokens,
+                "chunk_id": 0,
+                "doc_id": doc_id,
+            }
+        ]
+
+    chunks: list[TokenChunk] = []
+    step_size = max_tokens - overlap
+    for chunk_index, start in enumerate(range(0, total_tokens, step_size)):
+        end = min(start + max_tokens, total_tokens)
+        chunks.append({
+            "text": decode_tokens(tokens[start:end]),
+            "token_start": start,
+            "token_end": end,
+            "chunk_id": chunk_index,
+            "doc_id": doc_id,
+        })
+        if end == total_tokens:
+            break
+    return chunks
+
+
+def _split_long_sentence(
+    sentence: tuple[str, int, int],
+    doc_id: str,
+    section: str,
+    section_index: int,
+    max_tokens: int,
+    chunk_index_start: int,
+    sentence_idx: int,
+) -> tuple[list[Chunk], int]:
+    sentence_text, char_start, char_end = sentence
+    token_ids = encode_tokens(sentence_text)
+    chunks = []
+    next_chunk_index = chunk_index_start
+    search_from = 0
+
+    for token_start in range(0, len(token_ids), max_tokens):
+        sub_tokens = token_ids[token_start: token_start + max_tokens]
+        sub_text = decode_tokens(sub_tokens)
+        stripped_sub = sub_text.strip()
+
+        local_start = sentence_text.find(stripped_sub, search_from)
+        if local_start == -1:
+            sub_char_start = char_start
+            sub_char_end = char_end
+        else:
+            sub_char_start = char_start + local_start
+            sub_char_end = sub_char_start + len(stripped_sub)
+            search_from = local_start + len(stripped_sub)
+
+        chunks.append(Chunk(
+            doc_id=doc_id,
+            chunk_index=next_chunk_index,
+            text=sub_text,
+            section=section,
+            section_index=section_index,
+            sentence_start=sentence_idx,
+            sentence_end=sentence_idx,
+            char_start=sub_char_start,
+            char_end=sub_char_end,
+            token_count=len(sub_tokens),
+            chunk_hash=hash_text(sub_text),
+        ))
+        next_chunk_index += 1
+    return chunks, next_chunk_index
+
+
+def build_chunks(
+    sentences: list[tuple[str, int, int]],
+    doc_id: str,
+    section: str,
+    section_index: int,
+    max_tokens: int,
+    overlap_sentences: int,
+    start_idx: int,
+) -> list[Chunk]:
+    if not sentences:
+        return []
+
+    sentence_token_counts = [count_tokens(s[0]) for s in sentences]
+    chunks = []
+    chunk_index = start_idx
+    sentence_index = 0
+    sentence_count = len(sentences)
+
+    while sentence_index < sentence_count:
+        current_slice = []
+        current_token_total = 0
+        window_end = sentence_index
+
+        while window_end < sentence_count:
+            token_count = sentence_token_counts[window_end]
+            if current_slice and current_token_total + token_count > max_tokens:
+                break
+
+            if not current_slice and token_count > max_tokens:
+                split_chunks, chunk_index = _split_long_sentence(
+                    sentences[window_end],
+                    doc_id,
+                    section,
+                    section_index,
+                    max_tokens,
+                    chunk_index,
+                    sentence_index,
+                )
+                chunks.extend(split_chunks)
+                window_end += 1
+                sentence_index = window_end
+                break
+
+            current_slice.append(sentences[window_end])
+            current_token_total += token_count
+            window_end += 1
+
+        if not current_slice:
+            continue
+
+        chunk = _finalize_chunk(
+            current_slice,
+            doc_id,
+            section,
+            section_index,
+            chunk_index,
+            sentence_index,
+            max_tokens,
+        )
+        chunks.append(chunk)
+        chunk_index += 1
+
+        overlap = min(overlap_sentences, len(current_slice) - 1)
+        sentence_index = max(sentence_index + 1, window_end - overlap)
+
+    return chunks
+
+
+def _finalize_chunk(
+    sentence_slice: list[tuple[str, int, int]],
+    doc_id: str,
+    section: str,
+    section_index: int,
+    chunk_index: int,
+    sentence_start_index: int,
+    max_tokens: int,
+) -> Chunk:
+    text = " ".join(sentence[0] for sentence in sentence_slice)
+    token_ids = encode_tokens(text)
+    if len(token_ids) > max_tokens:
+        token_ids = token_ids[:max_tokens]
+        text = decode_tokens(token_ids)
+
+    return Chunk(
+        doc_id=doc_id,
+        chunk_index=chunk_index,
+        text=text,
+        section=section,
+        section_index=section_index,
+        sentence_start=sentence_start_index,
+        sentence_end=sentence_start_index + len(sentence_slice) - 1,
+        char_start=sentence_slice[0][1],
+        char_end=sentence_slice[-1][2],
+        token_count=len(token_ids),
+        chunk_hash=hash_text(text),
+    )
