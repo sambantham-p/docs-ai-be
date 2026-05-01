@@ -9,7 +9,7 @@ from app.constants.chunker_constant import (
     HEADING_WORD_STRIP_CHARS,
     MARKDOWN_HEADING_RE,
     NUMBERED_HEADING_RE,
-    SPACY_LANGUAGE,
+    SPACY_LANGUAGE, MAX_SENTENCES_PER_SECTION, MAX_SENTENCES_PER_DOC,
 )
 from app.utils.chunker_utils import (
     count_tokens,
@@ -17,6 +17,9 @@ from app.utils.chunker_utils import (
     encode_tokens,
     hash_text,
 )
+
+NLP = spacy.blank(SPACY_LANGUAGE)
+NLP.add_pipe("sentencizer")
 
 
 @dataclass(frozen=True)
@@ -53,10 +56,6 @@ class Chunk:
             )
 
 
-NLP = spacy.blank(SPACY_LANGUAGE)
-NLP.add_pipe("sentencizer")
-
-
 def hybrid_chunk(
     text: str,
     doc_id: str,
@@ -66,17 +65,31 @@ def hybrid_chunk(
 ) -> list[dict]:
     if not text.strip():
         raise ValueError("Empty document")
+    if len(text) > 5_000_000:
+        raise ValueError("Document too large")
     if max_tokens <= 0:
         raise ValueError(f"max_tokens must be > 0, got {max_tokens}")
     if overlap_sentences < 0:
         raise ValueError(f"overlap_sentences must be >= 0, got {overlap_sentences}")
-
     sections = split_sections(text)
     chunk_results = []
     next_chunk_index = 0
-
+    total_sentences = 0
     for section_index, (section_title, section_text, section_start, _) in enumerate(sections):
         sentences = split_sentences(section_text, section_start)
+        section_label = section_title or f"section_{section_index}"
+        if len(sentences) > MAX_SENTENCES_PER_SECTION:
+            raise ValueError(
+                f"Section '{section_label}' has too many sentences "
+                f"({len(sentences)} > {MAX_SENTENCES_PER_SECTION}) — possible malformed input"
+            )
+        total_sentences += len(sentences)
+        if total_sentences > MAX_SENTENCES_PER_DOC:
+            raise ValueError(
+                f"Document '{doc_id}' exceeded total sentence limit "
+                f"({total_sentences} > {MAX_SENTENCES_PER_DOC}) "
+                f"at section '{section_label}' — possible malformed input"
+            )
         chunks = build_chunks(
             sentences,
             doc_id,
@@ -92,7 +105,6 @@ def hybrid_chunk(
 
         chunk_results.extend(chunk.to_dict() for chunk in chunks)
         next_chunk_index += len(chunks)
-
     return chunk_results
 
 
@@ -165,22 +177,9 @@ def _split_long_sentence(
     token_ids = encode_tokens(sentence_text)
     chunks = []
     next_chunk_index = chunk_index_start
-    search_from = 0
-
     for token_start in range(0, len(token_ids), max_tokens):
         sub_tokens = token_ids[token_start: token_start + max_tokens]
         sub_text = decode_tokens(sub_tokens)
-        stripped_sub = sub_text.strip()
-
-        local_start = sentence_text.find(stripped_sub, search_from)
-        if local_start == -1:
-            sub_char_start = char_start
-            sub_char_end = char_end
-        else:
-            sub_char_start = char_start + local_start
-            sub_char_end = sub_char_start + len(stripped_sub)
-            search_from = local_start + len(stripped_sub)
-
         chunks.append(Chunk(
             doc_id=doc_id,
             chunk_index=next_chunk_index,
@@ -189,8 +188,8 @@ def _split_long_sentence(
             section_index=section_index,
             sentence_start=sentence_idx,
             sentence_end=sentence_idx,
-            char_start=sub_char_start,
-            char_end=sub_char_end,
+            char_start=char_start,
+            char_end=char_end,
             token_count=len(sub_tokens),
             chunk_hash=hash_text(sub_text),
         ))
@@ -234,7 +233,7 @@ def build_chunks(
                     section_index,
                     max_tokens,
                     chunk_index,
-                    sentence_index,
+                    window_end,
                 )
                 chunks.extend(split_chunks)
                 window_end += 1
