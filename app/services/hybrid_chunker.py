@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-from typing import Optional, TypedDict
 import spacy
 from app.constants.chunker_constant import (
     BLACKLIST,
@@ -18,14 +17,6 @@ from app.utils.chunker_utils import (
     encode_tokens,
     hash_text,
 )
-
-
-class TokenChunk(TypedDict):
-    text: str
-    token_start: int
-    token_end: int
-    chunk_id: int
-    doc_id: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -159,50 +150,6 @@ def split_sections(text: str) -> list[tuple[str, str, int, int]]:
         sections.append((section_title, section_content, section_start, char_position))
 
     return sections if sections else [("", text, 0, len(text))]
-
-
-def split_by_tokens(
-    text: str,
-    max_tokens: int,
-    overlap: int = 0,
-    doc_id: Optional[str] = None,
-) -> list[TokenChunk]:
-    if not isinstance(text, str):
-        raise TypeError("text must be a string")
-    if not text.strip():
-        return []
-    if max_tokens <= 0:
-        raise ValueError("max_tokens must be > 0")
-    if not (0 <= overlap < max_tokens):
-        raise ValueError("overlap must be in range [0, max_tokens)")
-
-    tokens = encode_tokens(text)
-    total_tokens = len(tokens)
-    if total_tokens <= max_tokens:
-        return [
-            {
-                "text": decode_tokens(tokens),
-                "token_start": 0,
-                "token_end": total_tokens,
-                "chunk_id": 0,
-                "doc_id": doc_id,
-            }
-        ]
-
-    chunks: list[TokenChunk] = []
-    step_size = max_tokens - overlap
-    for chunk_index, start in enumerate(range(0, total_tokens, step_size)):
-        end = min(start + max_tokens, total_tokens)
-        chunks.append({
-            "text": decode_tokens(tokens[start:end]),
-            "token_start": start,
-            "token_end": end,
-            "chunk_id": chunk_index,
-            "doc_id": doc_id,
-        })
-        if end == total_tokens:
-            break
-    return chunks
 
 
 def _split_long_sentence(

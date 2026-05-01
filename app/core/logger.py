@@ -57,6 +57,7 @@ def _project_root() -> Path:
 
 """Resolve and create log directory from env or fallback to project logs folder."""
 def _resolve_log_dir(project_root: Path) -> tuple[Path, str | None]:
+    global warning
     env_dir = os.getenv("LOG_DIR")
     if env_dir:
         try:
