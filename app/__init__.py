@@ -1,3 +1,11 @@
-# Minimal package initialization
-__all__ = ["core", "routers", "services"]
+"""Application package for the DocMind backend."""
 
+__all__ = [
+    "config",
+    "constants",
+    "core",
+    "models",
+    "routers",
+    "services",
+    "utils",
+]
