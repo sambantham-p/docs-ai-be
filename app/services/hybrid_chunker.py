@@ -60,7 +60,6 @@ def hybrid_chunk(
     text: str,
     doc_id: str,
     max_tokens: int = DEFAULT_CHUNK_MAX_TOKENS,
-    overlap_sentences: int = DEFAULT_OVERLAP_SENTENCES,
     validate: bool = DEFAULT_VALIDATE_CHUNKS,
 ) -> list[dict]:
     if not text.strip():
@@ -69,8 +68,7 @@ def hybrid_chunk(
         raise ValueError("Document too large")
     if max_tokens <= 0:
         raise ValueError(f"max_tokens must be > 0, got {max_tokens}")
-    if overlap_sentences < 0:
-        raise ValueError(f"overlap_sentences must be >= 0, got {overlap_sentences}")
+    overlap_tokens = int(max_tokens * 0.2)
     sections = split_sections(text)
     chunk_results = []
     next_chunk_index = 0
@@ -96,7 +94,7 @@ def hybrid_chunk(
             section_title,
             section_index,
             max_tokens,
-            overlap_sentences,
+            overlap_tokens,
             next_chunk_index,
         )
         if validate:
@@ -203,65 +201,58 @@ def build_chunks(
     section: str,
     section_index: int,
     max_tokens: int,
-    overlap_sentences: int,
+    overlap_tokens: int,
     start_idx: int,
 ) -> list[Chunk]:
     if not sentences:
         return []
-
     sentence_token_counts = [count_tokens(s[0]) for s in sentences]
     chunks = []
     chunk_index = start_idx
     sentence_index = 0
     sentence_count = len(sentences)
-
     while sentence_index < sentence_count:
         current_slice = []
         current_token_total = 0
         window_end = sentence_index
-
+        # Build window
         while window_end < sentence_count:
             token_count = sentence_token_counts[window_end]
-            if current_slice and current_token_total + token_count > max_tokens:
-                break
-
+            # Long sentence: split into sub-chunks, no overlap, advance
             if not current_slice and token_count > max_tokens:
                 split_chunks, chunk_index = _split_long_sentence(
                     sentences[window_end],
-                    doc_id,
-                    section,
-                    section_index,
-                    max_tokens,
-                    chunk_index,
-                    window_end,
+                    doc_id, section, section_index,
+                    max_tokens, chunk_index, window_end,
                 )
                 chunks.extend(split_chunks)
-                window_end += 1
-                sentence_index = window_end
+                sentence_index = window_end + 1
+                window_end = sentence_index
                 break
-
+            if current_slice and current_token_total + token_count > max_tokens:
+                break
             current_slice.append(sentences[window_end])
             current_token_total += token_count
             window_end += 1
-
         if not current_slice:
             continue
-
         chunk = _finalize_chunk(
-            current_slice,
-            doc_id,
-            section,
-            section_index,
-            chunk_index,
-            sentence_index,
-            max_tokens,
+            current_slice, doc_id, section, section_index,
+            chunk_index, sentence_index, max_tokens,
         )
         chunks.append(chunk)
         chunk_index += 1
-
-        overlap = min(overlap_sentences, len(current_slice) - 1)
-        sentence_index = max(sentence_index + 1, window_end - overlap)
-
+        # Token-based overlap backtrack (~20% of max_tokens)
+        if overlap_tokens > 0 and window_end > sentence_index + 1:
+            backtrack_tokens = 0
+            backtrack_index = window_end - 1
+            while backtrack_index > sentence_index and backtrack_tokens < overlap_tokens:
+                backtrack_tokens += sentence_token_counts[backtrack_index]
+                backtrack_index -= 1
+            next_index = backtrack_index + 1
+        else:
+            next_index = window_end
+        sentence_index = max(next_index, sentence_index + 1)
     return chunks
 
 
