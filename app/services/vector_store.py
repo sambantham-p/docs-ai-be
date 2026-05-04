@@ -5,6 +5,8 @@ from app.config.settings import EMBEDDING_DIM
 from app.db.mongodb import chunk_collection, counter_collection
 from app.db.faiss_store import add_vectors
 from app.services.embedder import embed_documents
+
+
 logger = logging.getLogger(__name__)
 
 

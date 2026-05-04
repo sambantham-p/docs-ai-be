@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class StructuredJsonFormatter(logging.Formatter):
-    """Formats log records into structured JSON for machine-readable logging."""
+    # Formats log records into structured JSON for machine-readable logging.
 
     def format(self, record: logging.LogRecord) -> str:
         ts = record.created
@@ -47,7 +47,7 @@ class StructuredJsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False)
 
 
-"""Resolve project root from env or fallback to repository structure."""
+# Resolve project root from env or fallback to repository structure.
 def _project_root() -> Path:
     env_root = os.getenv("PROJECT_ROOT")
     if env_root:
@@ -55,7 +55,7 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-"""Resolve and create log directory from env or fallback to project logs folder."""
+# Resolve and create log directory from env or fallback to project logs folder.
 def _resolve_log_dir(project_root: Path) -> tuple[Path, str | None]:
     global warning
     env_dir = os.getenv("LOG_DIR")
@@ -71,7 +71,7 @@ def _resolve_log_dir(project_root: Path) -> tuple[Path, str | None]:
     return fallback, warning if env_dir else None
 
 
-"""Apply secure file permissions to log files if they exist."""
+# Apply secure file permissions to log files if they exist.
 def _apply_file_permissions(*paths: Path) -> None:
     for path in paths:
         try:
@@ -81,7 +81,7 @@ def _apply_file_permissions(*paths: Path) -> None:
             logger.debug("Failed to set permissions for %s", path)
 
 
-"""Ensure log files exist before applying permissions."""
+# Ensure log files exist before applying permissions.
 def _ensure_files_exist(*paths: Path) -> None:
     for path in paths:
         try:
@@ -90,7 +90,7 @@ def _ensure_files_exist(*paths: Path) -> None:
             logger.debug("Failed to create file %s", path)
 
 
-"""Clear existing root handlers to prevent duplicate logging."""
+# Clear existing root handlers to prevent duplicate logging.
 def _clear_root_handlers() -> list[str]:
     root = logging.getLogger()
     close_errors = []

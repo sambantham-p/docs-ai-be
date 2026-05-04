@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from app.db.faiss_store import faiss_index, faiss_lock
 
+
 logger = logging.getLogger(__name__)
 
 

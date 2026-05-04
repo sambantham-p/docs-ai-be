@@ -3,6 +3,7 @@ from pathlib import Path
 import trafilatura
 from app.utils.parser_utils import clean_text, parse_docx, parse_pdf, parse_txt
 
+
 logger = logging.getLogger(__name__)
 
 

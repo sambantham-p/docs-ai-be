@@ -1,18 +1,12 @@
 import hashlib
-from typing import Optional, TypedDict
-
+from typing import Optional
 import tiktoken
-
 from app.constants.chunker_constant import TOKEN_ENCODING_NAME
+from app.schemas.chunk_schemas import TokenChunk
+
 
 _ENCODER: tiktoken.Encoding | None = None
 
-class TokenChunk(TypedDict):
-    text: str
-    token_start: int
-    token_end: int
-    chunk_id: int
-    doc_id: Optional[str]
 
 def get_encoder() -> tiktoken.Encoding:
     global _ENCODER
@@ -23,6 +17,7 @@ def get_encoder() -> tiktoken.Encoding:
 
 def warmup_tokenizer() -> None:
     get_encoder()
+
 
 def hash_text(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
@@ -38,6 +33,7 @@ def encode_tokens(text: str) -> list[int]:
 
 def decode_tokens(token_ids: list[int]) -> str:
     return get_encoder().decode_bytes(token_ids).decode("utf-8", errors="replace")
+
 
 def split_by_tokens(
     text: str,

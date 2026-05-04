@@ -5,6 +5,7 @@ from app.db.mongodb import chunk_collection
 from app.services.embedder import embed_query
 from app.services.mmr import mmr_select
 
+
 logger = logging.getLogger(__name__)
 
 

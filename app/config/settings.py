@@ -26,7 +26,6 @@ _JUNK_LINE_RE: Final[re.Pattern] = re.compile(r"^[\W_]+$")
 
 # FAISS / Embeddings
 EMBEDDING_DIM:    Final[int] = 768
-GEMINI_API_KEY: Final[str] = os.getenv("GEMINI_API_KEY", "")
 EMBEDDING_MODEL = "models/text-embedding-004"
 FAISS_INDEX_PATH: Final[Path] = Path(
     os.getenv("FAISS_INDEX_PATH", BASE_DIR / "data/faiss.index")
@@ -34,7 +33,12 @@ FAISS_INDEX_PATH: Final[Path] = Path(
 FAISS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
 FAISS_SAVE_EVERY: Final[int] = 500
 
+# Gemini
+MAX_CONTEXT_CHARS = 7_000
+GEMINI_API_KEY: Final[str] = os.getenv("GEMINI_API_KEY", "")
+LLM_TIMEOUT: Final[int] = int(os.getenv("LLM_TIMEOUT", "30"))
+
 # Retrieval Config
-FAISS_CANDIDATE_CAP:      Final[int] = 200
-RETRIEVAL_BASE_FETCH:     Final[int] = 4
+FAISS_CANDIDATE_CAP: Final[int] = 200
+RETRIEVAL_BASE_FETCH: Final[int] = 4
 RETRIEVAL_FILTERED_FETCH: Final[int] = 12

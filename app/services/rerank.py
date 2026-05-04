@@ -1,9 +1,8 @@
-# app/services/reranker.py
-
 import asyncio
 import logging
 import threading
 from sentence_transformers import CrossEncoder
+
 
 logger = logging.getLogger(__name__)
 

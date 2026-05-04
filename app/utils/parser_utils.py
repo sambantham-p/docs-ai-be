@@ -2,10 +2,8 @@ import logging
 import re
 from pathlib import Path
 from typing import Optional
-
 import fitz
 from docx import Document
-
 from app.config.settings import MAX_LINE_LENGTH, MAX_PDF_CHARS, _JUNK_LINE_RE
 
 
@@ -39,7 +37,6 @@ def parse_pdf(path: str) -> str:
                 logger.warning(f"Empty page detected: page {i}")
     if not pages:
         raise ValueError("No extractable text (possibly scanned PDF)")
-
     return "\n\n".join(pages)
 
 

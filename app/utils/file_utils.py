@@ -3,7 +3,9 @@ from pathlib import Path
 import filetype
 from app.config.settings import ALLOWED_MIME_TYPES
 
+
 logger = logging.getLogger(__name__)
+
 
 # Removes temporary file safely from the disk
 def delete_file(path: Path) -> None:

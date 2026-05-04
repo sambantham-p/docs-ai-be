@@ -1,10 +1,8 @@
-from dataclasses import dataclass, asdict
 import spacy
 from app.constants.chunker_constant import (
     BLACKLIST,
     CAPS_HEADING_RE,
     DEFAULT_CHUNK_MAX_TOKENS,
-    DEFAULT_OVERLAP_SENTENCES,
     DEFAULT_VALIDATE_CHUNKS,
     HEADING_WORD_STRIP_CHARS,
     MARKDOWN_HEADING_RE,
@@ -17,43 +15,11 @@ from app.utils.chunker_utils import (
     encode_tokens,
     hash_text,
 )
+from app.schemas.chunk_schemas import Chunk
+
 
 NLP = spacy.blank(SPACY_LANGUAGE)
 NLP.add_pipe("sentencizer")
-
-
-@dataclass(frozen=True)
-class Chunk:
-    doc_id: str
-    chunk_index: int
-    text: str
-    section: str
-    section_index: int
-    sentence_start: int
-    sentence_end: int
-    char_start: int
-    char_end: int
-    token_count: int
-    chunk_hash: str
-
-    def to_dict(self):
-        return asdict(self)
-
-    def validate(self, doc_len: int):
-        if not self.text.strip():
-            raise ValueError(f"Chunk {self.chunk_index}: empty text")
-        if self.token_count <= 0:
-            raise ValueError(f"Chunk {self.chunk_index}: zero token count")
-        if not (0 <= self.char_start <= self.char_end <= doc_len):
-            raise ValueError(
-                f"Chunk {self.chunk_index}: invalid char range "
-                f"[{self.char_start}, {self.char_end}] for doc_len={doc_len}"
-            )
-        if self.sentence_start > self.sentence_end:
-            raise ValueError(
-                f"Chunk {self.chunk_index}: sentence_start ({self.sentence_start}) "
-                f"> sentence_end ({self.sentence_end})"
-            )
 
 
 def hybrid_chunk(

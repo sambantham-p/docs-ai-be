@@ -7,4 +7,10 @@ __all__ = [
     "ingestion_service",
     "retriever",
     "vector_store",
+    "mmr",
+    "rerank",
+    "llm",
+    "context_builder",
+    "confidence",
+    "qa_service",
 ]

@@ -1,12 +1,16 @@
+import json
 import logging
+from fastapi import Request
+from app.config.settings import MAX_CONTEXT_CHARS
 from app.prompt import SYSTEM_PROMPT, build_prompt
 from app.services.confidence import compute_confidence, confidence_label
 from app.services.context_builder import build_context
-from app.services.llm import generate_answer, MAX_CONTEXT_CHARS
+from app.services.llm import generate_answer, stream_answer
 from app.services.retriever import retrieve
+from app.utils.stream_utils import split_text
+
 
 logger = logging.getLogger(__name__)
-
 _FALLBACK = "I don't have enough information to answer this question."
 
 
@@ -88,3 +92,24 @@ async def retrieve_and_build_prompt(
     prompt     = SYSTEM_PROMPT + "\n" + build_prompt(query, context)
     confidence = compute_confidence(chunks, top_k=top_k)
     return chunks, prompt, confidence
+
+
+async def empty_stream():
+    yield "data: I don't have enough information to answer this question.\n\n"
+    yield "data: [DONE]\n\n"
+
+
+async def generate_qa_stream(prompt: str, http_request: Request, confidence: float, sources: list[str]):
+    async for token in stream_answer(prompt):
+        if await http_request.is_disconnected():
+            logger.info("Client disconnected — stopping stream")
+            return
+        for part in split_text(token):
+            yield f"event: token\ndata: {part}\n\n"
+    meta = json.dumps({
+        "confidence": confidence,
+        "confidence_label": confidence_label(confidence),
+        "sources": sources,
+    })
+    yield f"event: meta\ndata: {meta}\n\n"
+    yield "event: done\ndata: [DONE]\n\n"
