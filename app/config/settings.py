@@ -1,10 +1,14 @@
-from pathlib import Path
-import re
 import os
+import re
+from pathlib import Path
 from typing import Final
+from dotenv import load_dotenv
 
+
+# Load environment variables
+load_dotenv()
 # MongoDB
-MONGO_URI: Final[str] = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI: Final[str] = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 MONGO_DB:  Final[str] = os.getenv("MONGO_DB",  "rag_db")
 
 # File Upload
