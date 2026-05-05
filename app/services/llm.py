@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is not set.")
 genai.configure(api_key=GEMINI_API_KEY)
-_model = genai.GenerativeModel("gemini-1.5-flash")
+_model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 def _generate(prompt: str) -> str:

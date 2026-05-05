@@ -14,6 +14,7 @@ from app.utils.chunker_utils import (
     decode_tokens,
     encode_tokens,
     hash_text,
+    is_valid_chunk,
 )
 from app.schemas.chunk_schemas import Chunk
 
@@ -66,7 +67,7 @@ def hybrid_chunk(
         if validate:
             for chunk in chunks:
                 chunk.validate(len(text))
-
+        chunks = [c for c in chunks if is_valid_chunk(c.text)]
         chunk_results.extend(chunk.to_dict() for chunk in chunks)
         next_chunk_index += len(chunks)
     return chunk_results
@@ -89,7 +90,6 @@ def split_sections(text: str) -> list[tuple[str, str, int, int]]:
     section_start = 0
     char_position = 0
     previous_line_blank = True
-
     for line in lines:
         stripped = line.strip()
         heading_words = [
@@ -117,10 +117,8 @@ def split_sections(text: str) -> list[tuple[str, str, int, int]]:
             section_start = char_position + len(line)
         else:
             section_lines.append(line)
-
         previous_line_blank = not stripped
         char_position += len(line)
-
     section_content = "".join(section_lines)
     if section_content.strip():
         sections.append((section_title, section_content, section_start, char_position))
@@ -236,7 +234,6 @@ def _finalize_chunk(
     if len(token_ids) > max_tokens:
         token_ids = token_ids[:max_tokens]
         text = decode_tokens(token_ids)
-
     return Chunk(
         doc_id=doc_id,
         chunk_index=chunk_index,

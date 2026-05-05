@@ -20,7 +20,24 @@ def warmup_tokenizer() -> None:
 
 
 def hash_text(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
+    # Collapse whitespace to preserve semantic hashing
+    normalized = " ".join(text.split())
+    return hashlib.sha256(normalized.encode()).hexdigest()
+
+
+def is_valid_chunk(text: str) -> bool:
+    t = text.strip()
+    if len(t) < 40:
+        return False
+    if len(t.split()) < 8:
+        return False
+    alpha_ratio = sum(c.isalpha() for c in t) / max(len(t), 1)
+    if alpha_ratio < 0.5:
+        return False
+    filler = ["you've got this", "keep going", "you can do it", "move forward"]
+    if any(f in t.lower() for f in filler):
+        return False
+    return True
 
 
 def count_tokens(text: str) -> int:

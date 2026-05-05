@@ -22,6 +22,5 @@ class ChunkModel(BaseModel):
     text: str
     token_start: int | None = None
     token_end: int | None = None
-    faiss_id: int | None = None
-    faiss_status: str
+    index_status: str
     created_at: datetime

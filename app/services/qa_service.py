@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+
 from fastapi import Request
 from app.config.settings import MAX_CONTEXT_CHARS
 from app.prompt import SYSTEM_PROMPT, build_prompt
@@ -12,6 +14,17 @@ from app.utils.stream_utils import split_text
 
 logger = logging.getLogger(__name__)
 _FALLBACK = "I don't have enough information to answer this question."
+
+
+def clean_answer(text: str) -> str:
+    # remove [Doc: xxx]
+    text = re.sub(r"\[Doc:.*?\]", "", text)
+    # fix escaped newlines + spacing
+    return (
+        text.replace("\\n", "\n")
+            .replace("\n\n\n", "\n\n")
+            .strip()
+    )
 
 
 def _truncate_chunks_by_chars(
@@ -61,7 +74,9 @@ async def answer_query(
     if not answer:
         logger.error("LLM returned empty response")
         return _fallback_response(chunks)
-    seen:    set[str]  = set()
+    answer = clean_answer(answer)
+    # build unique sources
+    seen: set[str] = set()
     sources: list[str] = []
     for c in chunks:
         if c["doc_id"] not in seen:
@@ -69,10 +84,10 @@ async def answer_query(
             sources.append(c["doc_id"])
     confidence = compute_confidence(chunks, top_k=top_k)
     return {
-        "answer":           answer,
-        "sources":          sources,
-        "chunks":           chunks,
-        "confidence":       confidence,
+        "answer": answer,
+        "sources": sources,
+        "chunks": chunks,
+        "confidence": confidence,
         "confidence_label": confidence_label(confidence),
     }
 

@@ -2,7 +2,6 @@ import logging
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import ASCENDING, IndexModel
 from app.config.settings import MONGO_URI, MONGO_DB
-
 from app.constants.db_constants import (
     MONGO_DOC_COLLECTION,
     MONGO_CHUNK_COLLECTION,
@@ -12,37 +11,45 @@ from app.constants.db_constants import (
     FIELD_STATUS,
     FIELD_CREATED_AT,
     FIELD_CHUNK_INDEX,
-    FIELD_FAISS_ID,
-    FIELD_FAISS_STATUS
+    FIELD_INDEX_STATUS,
 )
 
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 client: AsyncIOMotorClient = AsyncIOMotorClient(MONGO_URI)
 db: AsyncIOMotorDatabase   = client[MONGO_DB]
+
 
 # Collections
 doc_collection     = db[MONGO_DOC_COLLECTION]
 chunk_collection   = db[MONGO_CHUNK_COLLECTION]
 counter_collection = db[MONGO_COUNTER_COLLECTION]
 
-# Create all MongoDB indexes on startup.
+
 async def setup_indexes() -> None:
-    # documents
     await doc_collection.create_indexes([
-        IndexModel([(FIELD_DOC_ID,     ASCENDING)], unique=True),
-        IndexModel([(FIELD_STATUS,     ASCENDING)]),
-        IndexModel([(FIELD_CREATED_AT, ASCENDING)]),
+        IndexModel([(FIELD_DOC_ID,     ASCENDING)], unique=True, background=True),
+        IndexModel([("content_hash",   ASCENDING)], unique=True, background=True),
+        IndexModel([(FIELD_STATUS,     ASCENDING)],              background=True),
+        IndexModel([(FIELD_CREATED_AT, ASCENDING)],              background=True),
     ])
 
-    # chunks
+
     await chunk_collection.create_indexes([
-        IndexModel([(FIELD_CHUNK_ID, ASCENDING)], unique=True),
-        IndexModel([(FIELD_DOC_ID, ASCENDING)]),
-        IndexModel([(FIELD_FAISS_ID, ASCENDING)]),
-        IndexModel([(FIELD_FAISS_STATUS, ASCENDING)]),
-        IndexModel([(FIELD_DOC_ID, ASCENDING), (FIELD_CHUNK_INDEX, ASCENDING)]),  
-        IndexModel([(FIELD_FAISS_ID, ASCENDING), (FIELD_DOC_ID, ASCENDING)]), 
+        IndexModel([(FIELD_CHUNK_ID,     ASCENDING)], unique=True, background=True),
+        IndexModel([(FIELD_DOC_ID,       ASCENDING)],             background=True),
+        IndexModel([(FIELD_INDEX_STATUS, ASCENDING)],             background=True),
+        IndexModel([(FIELD_DOC_ID, ASCENDING), (FIELD_CHUNK_INDEX, ASCENDING)], background=True),
+        IndexModel(
+            [("chunk_hash", ASCENDING)],
+            name="chunk_hash_full_idx",
+            background=True,
+        ),
+        IndexModel(
+            [("chunk_hash", ASCENDING)],
+            name="chunk_hash_indexed_partial_idx",
+            partialFilterExpression={FIELD_INDEX_STATUS: "indexed"},
+            background=True,
+        ),
     ])
-
     logger.info("MongoDB indexes ensured")

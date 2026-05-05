@@ -7,7 +7,6 @@ class ChunkResult(BaseModel):
     text:          str
     section_title: str | None
     chunk_index:   int
-    faiss_id:      int
     score:         float
 
 
@@ -28,3 +27,5 @@ class QAResponse(BaseModel):
 class UploadResponse(BaseModel):
     status: str
     doc_id: str
+    duplicate: bool = False
+

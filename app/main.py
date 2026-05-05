@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from app.core.logger import setup_logging
-from app.db.faiss_store import force_save_index
 from app.db.mongodb import setup_indexes
+from app.services.rerank import _get_ranker
 from app.utils.chunker_utils import warmup_tokenizer
 from app.routers.upload import router as upload_router
 from app.routers.query import router as query_router
@@ -27,8 +27,11 @@ async def lifespan(app: FastAPI):
     logger.info("Ensuring MongoDB indexes...")
     logger.info("Startup complete")
     await setup_indexes()
+    logger.info("Warming up reranker model...")
+    _get_ranker()
+    logger.info("Reranker ready.")
+    logger.info("Startup complete")
     yield
-    force_save_index()
     await http_client.aclose()
     logger.info("Shutting down DocMind Application...")
 

@@ -6,7 +6,7 @@ from app.schemas.responses import QueryResponse, ChunkResult
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/query", tags=["query"])
+router = APIRouter(prefix="/query")
 
 
 @router.post("/", response_model=QueryResponse)

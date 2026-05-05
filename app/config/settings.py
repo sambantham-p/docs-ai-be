@@ -28,21 +28,21 @@ MAX_PDF_CHARS:  Final[int] = 500_000
 MAX_LINE_LENGTH: Final[int] = 2000
 _JUNK_LINE_RE: Final[re.Pattern] = re.compile(r"^[\W_]+$")
 
-# FAISS / Embeddings
-EMBEDDING_DIM:    Final[int] = 768
-EMBEDDING_MODEL = "models/text-embedding-004"
-FAISS_INDEX_PATH: Final[Path] = Path(
-    os.getenv("FAISS_INDEX_PATH", BASE_DIR / "data/faiss.index")
+# Vector DB (Qdrant)
+EMBEDDING_DIM:    Final[int] = 3072
+EMBEDDING_MODEL = "gemini-embedding-001"
+QDRANT_PATH: Final[Path] = Path(
+    os.getenv("QDRANT_PATH", BASE_DIR / "data/qdrant")
 )
-FAISS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-FAISS_SAVE_EVERY: Final[int] = 500
+QDRANT_PATH.mkdir(parents=True, exist_ok=True)
+QDRANT_COLLECTION: Final[str] = os.getenv("QDRANT_COLLECTION", "rag_chunks")
 
 # Gemini
-MAX_CONTEXT_CHARS = 7_000
+MAX_CONTEXT_CHARS = 9_000
 GEMINI_API_KEY: Final[str] = os.getenv("GEMINI_API_KEY", "")
 LLM_TIMEOUT: Final[int] = int(os.getenv("LLM_TIMEOUT", "30"))
 
 # Retrieval Config
-FAISS_CANDIDATE_CAP: Final[int] = 200
-RETRIEVAL_BASE_FETCH: Final[int] = 4
-RETRIEVAL_FILTERED_FETCH: Final[int] = 12
+QDRANT_CANDIDATE_CAP: Final[int] = 100
+RETRIEVAL_BASE_FETCH: Final[int] = 10
+RETRIEVAL_FILTERED_FETCH: Final[int] = 14

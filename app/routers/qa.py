@@ -7,7 +7,7 @@ from app.services.qa_service import answer_query, retrieve_and_build_prompt, emp
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/qa", tags=["qa"])
+router = APIRouter(prefix="/qa")
 
 
 @router.post("/", response_model=QAResponse)
