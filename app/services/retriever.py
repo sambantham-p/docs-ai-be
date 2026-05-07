@@ -28,7 +28,7 @@ async def retrieve(
     scores, ranked_chunk_ids = query_vectors(query_vec, fetch_count, doc_id=doc_id)
     if not ranked_chunk_ids:
         logger.warning("Qdrant returned no results")
-        return [], False
+        return [], True
     score_by_chunk_id = {cid: score for cid, score in zip(ranked_chunk_ids, scores)}
     mongo_filter: dict = {
         "chunk_id": {"$in": ranked_chunk_ids},
@@ -49,7 +49,7 @@ async def retrieve(
     ).to_list(length=None)
     if not raw_chunks:
         logger.warning(f"No indexed chunks found in Mongo (doc_id={doc_id})")
-        return [], False
+        return [], True
     chunk_by_id = {}
     for c in raw_chunks:
         cid = c["chunk_id"]
@@ -67,7 +67,7 @@ async def retrieve(
     ]
     if not available_ids:
         logger.warning("No overlap between Qdrant results and Mongo documents")
-        return [], False
+        return [], True
     filtered_ids = [
         cid for cid in available_ids
         if is_valid_chunk(chunk_by_id[cid]["text"])
