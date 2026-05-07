@@ -13,7 +13,7 @@ router = APIRouter(prefix="/query")
 async def query_endpoint(request: QueryRequest) -> QueryResponse:
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
-    chunks = await retrieve(
+    chunks, allow_general = await retrieve(
         query=request.query,
         doc_id=request.doc_id,
         top_k=request.top_k,
