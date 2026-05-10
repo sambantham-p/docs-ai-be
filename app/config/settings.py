@@ -34,6 +34,8 @@ EMBEDDING_MODEL = "gemini-embedding-001"
 QDRANT_PATH: Final[Path] = Path(
     os.getenv("QDRANT_PATH", BASE_DIR / "data/qdrant")
 )
+QDRANT_URL: Final[str] = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API: Final[str] = os.getenv("QDRANT_API", "")
 QDRANT_PATH.mkdir(parents=True, exist_ok=True)
 QDRANT_COLLECTION: Final[str] = os.getenv("QDRANT_COLLECTION", "rag_chunks")
 

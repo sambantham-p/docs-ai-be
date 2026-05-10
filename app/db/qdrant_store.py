@@ -9,11 +9,14 @@ from qdrant_client.models import (
     FieldCondition,
     MatchValue,
 )
-from app.config.settings import EMBEDDING_DIM, QDRANT_PATH, QDRANT_COLLECTION
+from app.config.settings import EMBEDDING_DIM, QDRANT_PATH, QDRANT_COLLECTION, QDRANT_URL, QDRANT_API
 
 
 logger = logging.getLogger(__name__)
-client = QdrantClient(path=str(QDRANT_PATH))
+client = QdrantClient(
+    url = QDRANT_URL,
+    api_key= QDRANT_API
+)
 
 
 if not client.collection_exists(QDRANT_COLLECTION):
