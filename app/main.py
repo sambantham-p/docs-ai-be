@@ -32,9 +32,10 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Qdrant...")
     init_qdrant()
     
-    logger.info("Warming up reranker model...")
-    _get_ranker()
-    logger.info("Reranker ready.")
+    # Reranker disabled for troubleshooting
+    # logger.info("Warming up reranker model...")
+    # _get_ranker()
+    # logger.info("Reranker ready.")
     logger.info("Startup complete")
     yield
     await http_client.aclose()

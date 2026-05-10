@@ -43,9 +43,11 @@ def _embed(texts: list[str], task_type: str) -> np.ndarray:
         embeddings = [embeddings]
 
     vectors = np.array(embeddings, dtype=np.float32)
+    logger.info(f"[DEBUG] Gemini returned vectors with shape: {vectors.shape}")
 
     # Shape validation
     if vectors.ndim != 2 or vectors.shape[1] != EMBEDDING_DIM:
+        logger.error(f"[DEBUG] Shape mismatch! Expected {EMBEDDING_DIM}, got {vectors.shape[1]}")
         raise ValueError(
             f"Gemini returned shape {vectors.shape}, "
             f"expected ({len(texts)}, {EMBEDDING_DIM})"

@@ -98,7 +98,9 @@ def query_vectors(
     if query_vec.dtype != np.float32:
         query_vec = query_vec.astype(np.float32)
     query_list = query_vec[0].tolist()
+    logger.info(f"[DEBUG] Incoming query - k: {k}, doc_id: {doc_id}")
     query_filter = None
+    
     if doc_id:
         query_filter = Filter(
             must=[
@@ -114,7 +116,14 @@ def query_vectors(
             query=query_list,
             query_filter=query_filter,
             limit=k,
+            with_payload=True
         )
+        if results.points:
+            for p in results.points:
+                res_doc_id = None
+                if p.payload and "doc_id" in p.payload:
+                    res_doc_id = p.payload["doc_id"]
+                logger.info(f"[DEBUG] Result Point: {p.id}, score: {p.score}, payload doc_id: {res_doc_id}")
     except Exception:
         logger.exception("Qdrant search failed")
         return [], []

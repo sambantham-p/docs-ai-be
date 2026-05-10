@@ -5,7 +5,7 @@ from app.db.qdrant_store import query_vectors
 from app.services.embedder import embed_query
 from app.utils.chunker_utils import is_valid_chunk
 from app.services.mmr import mmr_select
-from app.services.rerank import rerank_async
+#from app.services.rerank import rerank_async
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,9 @@ async def retrieve(
         lambda_param=lambda_param,
     )
     ordered = [chunk_by_id[cid] for cid in mmr_ids if cid in chunk_by_id]
-    reranked, allow_general = await rerank_async(query, ordered, top_k)
+    # Reranking disabled for troubleshooting
+    # reranked, allow_general = await rerank_async(query, ordered, top_k)
+    reranked, allow_general = ordered[:top_k], True  # Bypass rerank, allow general knowledge fallback
     missing = set(ranked_chunk_ids) - set(chunk_by_id)
     if missing:
         logger.warning(
