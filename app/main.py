@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 from app.core.logger import setup_logging
 from app.db.mongodb import setup_indexes
+from app.db.qdrant_store import init_qdrant
 from app.services.rerank import _get_ranker
 from app.utils.chunker_utils import warmup_tokenizer
 from app.routers.upload import router as upload_router
@@ -25,8 +26,12 @@ async def lifespan(app: FastAPI):
     logger.info("Tokenizer ready.")
     # Mongo indexes
     logger.info("Ensuring MongoDB indexes...")
-    logger.info("Startup complete")
     await setup_indexes()
+    
+    # Qdrant Initialization
+    logger.info("Initializing Qdrant...")
+    init_qdrant()
+    
     logger.info("Warming up reranker model...")
     _get_ranker()
     logger.info("Reranker ready.")

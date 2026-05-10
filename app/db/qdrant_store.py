@@ -8,6 +8,7 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    PayloadSchemaType,
 )
 from app.config.settings import EMBEDDING_DIM, QDRANT_PATH, QDRANT_COLLECTION, QDRANT_URL, QDRANT_API
 
@@ -19,24 +20,32 @@ client = QdrantClient(
 )
 
 
-if not client.collection_exists(QDRANT_COLLECTION):
-    client.create_collection(
-        collection_name=QDRANT_COLLECTION,
-        vectors_config=VectorParams(
-            size=EMBEDDING_DIM,
-            distance=Distance.COSINE,
-        ),
-    )
-    logger.info(f"Created Qdrant collection: {QDRANT_COLLECTION}")
-else:
-    # Validate dimension (important for safety)
-    info = client.get_collection(QDRANT_COLLECTION)
-    existing_dim = info.config.params.vectors.size
-    if existing_dim != EMBEDDING_DIM:
-        raise ValueError(
-            f"Embedding dim mismatch: Qdrant={existing_dim}, Expected={EMBEDDING_DIM}"
+def init_qdrant() -> None:
+    if not client.collection_exists(QDRANT_COLLECTION):
+        client.create_collection(
+            collection_name=QDRANT_COLLECTION,
+            vectors_config=VectorParams(
+                size=EMBEDDING_DIM,
+                distance=Distance.COSINE,
+            ),
         )
-    logger.info(f"Loaded Qdrant collection: {QDRANT_COLLECTION}")
+        logger.info(f"Created Qdrant collection: {QDRANT_COLLECTION}")
+    else:
+        # Validate dimension (important for safety)
+        info = client.get_collection(QDRANT_COLLECTION)
+        existing_dim = info.config.params.vectors.size
+        if existing_dim != EMBEDDING_DIM:
+            raise ValueError(
+                f"Embedding dim mismatch: Qdrant={existing_dim}, Expected={EMBEDDING_DIM}"
+            )
+        logger.info(f"Loaded Qdrant collection: {QDRANT_COLLECTION}")
+
+    # Ensure payload index exists (this is idempotent)
+    client.create_payload_index(
+        collection_name=QDRANT_COLLECTION,
+        field_name="doc_id",
+        field_schema=PayloadSchemaType.KEYWORD,
+    )
 
 
 # Insert or update vectors in Qdrant.
