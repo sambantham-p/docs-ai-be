@@ -12,7 +12,6 @@ class ChunkResult(BaseModel):
 
 class QueryResponse(BaseModel):
     query:  str
-    doc_id: str | None
     total:  int
     chunks: list[ChunkResult]
 

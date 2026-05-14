@@ -15,12 +15,10 @@ async def query_endpoint(request: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     chunks, allow_general = await retrieve(
         query=request.query,
-        doc_id=request.doc_id,
         top_k=request.top_k,
     )
     return QueryResponse(
         query=request.query,
-        doc_id=request.doc_id,
         total=len(chunks),
         chunks=[ChunkResult(**c) for c in chunks],
     )

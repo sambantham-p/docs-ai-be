@@ -91,25 +91,15 @@ def upsert_vectors(
 def query_vectors(
     query_vec: np.ndarray,
     k: int,
-    doc_id: str | None = None,
 ) -> tuple[list[float], list[str]]:
     if query_vec.ndim != 2 or query_vec.shape[0] != 1:
         raise ValueError("query_vec must be shape (1, EMBEDDING_DIM)")
     if query_vec.dtype != np.float32:
         query_vec = query_vec.astype(np.float32)
     query_list = query_vec[0].tolist()
-    logger.info(f"[DEBUG] Incoming query - k: {k}, doc_id: {doc_id}")
+    logger.info(f"[DEBUG] Incoming query - k: {k}")
     query_filter = None
     
-    if doc_id:
-        query_filter = Filter(
-            must=[
-                FieldCondition(
-                    key="doc_id",
-                    match=MatchValue(value=doc_id),
-                )
-            ]
-        )
     try:
         results = client.query_points(
             collection_name=QDRANT_COLLECTION,

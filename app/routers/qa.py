@@ -16,7 +16,6 @@ async def qa_endpoint(request: QARequest) -> QAResponse:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     result = await answer_query(
         query=request.query,
-        doc_id=request.doc_id,
         top_k=request.top_k,
     )
     return QAResponse(
@@ -36,7 +35,6 @@ async def qa_stream_endpoint(
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     chunks, prompt, confidence, allow_general = await retrieve_and_build_prompt(
         query=request.query,
-        doc_id=request.doc_id,
         top_k=request.top_k,
     )
     if not chunks:

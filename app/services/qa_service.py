@@ -57,10 +57,9 @@ def _fallback_response(chunks: list[dict] | None = None) -> dict:
 
 async def answer_query(
     query:  str,
-    doc_id: str | None = None,
     top_k:  int = 5,
 ) -> dict:
-    chunks, allow_general = await retrieve(query, doc_id=doc_id, top_k=top_k)
+    chunks, allow_general = await retrieve(query, top_k=top_k)
     if not chunks:
         logger.warning(f"No chunks retrieved for query: {query!r}")
         return _fallback_response()
@@ -101,10 +100,9 @@ async def answer_query(
 
 async def retrieve_and_build_prompt(
     query:  str,
-    doc_id: str | None = None,
     top_k:  int = 5,
 ) -> tuple[list[dict], str, float, bool]:          # ← added allow_general to return type
-    chunks, allow_general = await retrieve(query, doc_id=doc_id, top_k=top_k)  # ← unpack
+    chunks, allow_general = await retrieve(query, top_k=top_k)  # ← unpack
     if not chunks:
         return [], "", 0.0, False
 

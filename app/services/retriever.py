@@ -15,17 +15,16 @@ logger = logging.getLogger(__name__)
 
 async def retrieve(
     query: str,
-    doc_id: str | None = None,
     top_k: int = 5,
     lambda_param: float = 0.6,
 ) -> tuple[list[dict], bool]:
     query_vec = embed_query(query)
-    multiplier  = RETRIEVAL_FILTERED_FETCH if doc_id else RETRIEVAL_BASE_FETCH
+    multiplier  = RETRIEVAL_BASE_FETCH
     fetch_count = max(
         min(top_k * multiplier, QDRANT_CANDIDATE_CAP),
         20  # minimum pool
     )
-    scores, ranked_chunk_ids = query_vectors(query_vec, fetch_count, doc_id=doc_id)
+    scores, ranked_chunk_ids = query_vectors(query_vec, fetch_count)
     if not ranked_chunk_ids:
         logger.warning("Qdrant returned no results")
         return [], True
@@ -34,8 +33,6 @@ async def retrieve(
         "chunk_id": {"$in": ranked_chunk_ids},
         "index_status": "indexed",
     }
-    if doc_id:
-        mongo_filter["doc_id"] = doc_id
     raw_chunks = await chunk_collection.find(
         mongo_filter,
         {
@@ -48,7 +45,7 @@ async def retrieve(
         },
     ).to_list(length=None)
     if not raw_chunks:
-        logger.warning(f"No indexed chunks found in Mongo (doc_id={doc_id})")
+        logger.warning("No indexed chunks found in Mongo")
         return [], True
     chunk_by_id = {}
     for c in raw_chunks:
@@ -100,6 +97,6 @@ async def retrieve(
     if len(reranked) < top_k:
         logger.warning(
             f"Result starvation after rerank: {len(reranked)}/{top_k} "
-            f"(doc_id={doc_id}, cap={QDRANT_CANDIDATE_CAP})"
+            f"(cap={QDRANT_CANDIDATE_CAP})"
         )
     return reranked, allow_general
